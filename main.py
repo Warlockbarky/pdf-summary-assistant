@@ -28,9 +28,12 @@ def generate_summary(text, chunk_index=None, total_chunks=None):
         "Make sure the summary is concise, focusing only on the key details, and avoid unnecessary details. "
     )
 
-    # Add context about the chunk position
+    # Add detailed context about the chunk position
     if chunk_index is not None and total_chunks is not None:
-        user_message_prefix += f"This is part {chunk_index + 1} of {total_chunks}.\n\n"
+        user_message_prefix += (
+            f"This is part {chunk_index + 1} of {total_chunks}. "
+            "Summarize this part while keeping in mind that it is part of a larger document.\n\n"
+        )
 
     # Calculate the token space used by the system and user messages
     system_message_tokens = len(system_message.split())
@@ -75,6 +78,30 @@ def is_semantically_similar(summary1, summary2, threshold=0.8):
     similarity = util.pytorch_cos_sim(embeddings[0], embeddings[1]).item()
     return similarity > threshold
 
+
+def refine_summary(summaries):
+    # Merge similar summaries
+    refined_summaries = []
+    for summary in summaries:
+        merged = False
+        for i, existing_summary in enumerate(refined_summaries):
+            if is_semantically_similar(summary, existing_summary, threshold=0.7):
+                # Keep the longer or more detailed summary
+                if len(summary) > len(existing_summary):
+                    refined_summaries[i] = summary
+                merged = True
+                break
+        if not merged:
+            refined_summaries.append(summary)
+
+    # Group summaries by keywords or topics (optional)
+    grouped_summaries = sorted(refined_summaries, key=len, reverse=True)
+
+    # Combine summaries into a single text with logical flow
+    final_summary = " ".join(grouped_summaries)
+    return final_summary
+
+
 def summarize_pdf(pdf_file):
     # Open the file using its path
     with open(pdf_file.name, "rb") as f:
@@ -115,12 +142,14 @@ def summarize_pdf(pdf_file):
     # Deduplicate and filter summaries
     unique_summaries = []
     for summary in summaries:
-        if len(summary.split()) > 10:  # Filter out very short summaries
+        # Filter out very short or generic summaries
+        if len(summary.split()) > 10 and "please provide me" not in summary.lower():
+            # Check for semantic overlap
             if not any(is_semantically_similar(summary, existing_summary) for existing_summary in unique_summaries):
                 unique_summaries.append(summary)
 
-    # Combine all unique summaries
-    full_summary = "\n".join(unique_summaries)
+    # Refine and combine summaries
+    full_summary = refine_summary(unique_summaries)
 
     return full_summary
 
