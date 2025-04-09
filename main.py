@@ -18,7 +18,7 @@ llm = Llama(model_path=model_path)
 def generate_summary(text, chunk_index=None, total_chunks=None):
     # Define the maximum context window size
     max_context_tokens = 512
-    reserved_output_tokens = 200  # Reserve tokens for the model's output
+    reserved_output_tokens = 300  # Reserve tokens for the model's output
 
     # Define the system and user messages
     system_message = "You are a helpful assistant."
